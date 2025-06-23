@@ -119,8 +119,8 @@ const handleSignup = async (e) => {
     }
     
     // Phone validation
-    if (!/^05\d{8}$/.test(formData.phone)) {
-        showAlert('رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+    if (!/^07\d{9}$/.test(formData.phone)) {
+        showAlert('رقم الهاتف يجب أن يبدأ بـ 07 ويتكون من 11 أرقام', 'error');
         return;
     }
     
@@ -158,8 +158,8 @@ const handleAddCustomer = async (e) => {
     }
     
     // Phone validation
-    if (!/^05\d{8}$/.test(customerData.phone)) {
-        showAlert('رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+    if (!/^07\d{9}$/.test(customerData.phone)) {
+        showAlert('رقم الهاتف يجب أن يبدأ بـ 07 ويتكون من 11 أرقام', 'error');
         return;
     }
     
