@@ -42,6 +42,18 @@ const setupEventListeners = () => {
         addCustomerForm.addEventListener('submit', handleAddCustomer);
     }
     
+    // Edit customer form
+    const editCustomerForm = document.getElementById('edit-customer-form');
+    if (editCustomerForm) {
+        editCustomerForm.addEventListener('submit', handleEditCustomer);
+    }
+    
+    // Add transaction form
+    const addTransactionForm = document.getElementById('add-transaction-form');
+    if (addTransactionForm) {
+        addTransactionForm.addEventListener('submit', handleAddTransaction);
+    }
+    
     // Customer search
     const customerSearch = document.getElementById('customer-search');
     if (customerSearch) {
@@ -119,8 +131,8 @@ const handleSignup = async (e) => {
     }
     
     // Phone validation
-    if (!/^07\d{9}$/.test(formData.phone)) {
-        showAlert('رقم الهاتف يجب أن يبدأ بـ 07 ويتكون من 11 أرقام', 'error');
+    if (!/^05\d{8}$/.test(formData.phone)) {
+        showAlert('رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
         return;
     }
     
@@ -158,8 +170,8 @@ const handleAddCustomer = async (e) => {
     }
     
     // Phone validation
-    if (!/^07\d{9}$/.test(customerData.phone)) {
-        showAlert('رقم الهاتف يجب أن يبدأ بـ 07 ويتكون من 11 أرقام', 'error');
+    if (!/^05\d{8}$/.test(customerData.phone)) {
+        showAlert('رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
         return;
     }
     
@@ -175,7 +187,18 @@ const handleAddCustomer = async (e) => {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإضافة...';
         
-        await customerService.addCustomer(customerData);
+        const newCustomer = await customerService.addCustomer(customerData);
+        
+        // Add the new customer to the current list immediately
+        currentCustomers.unshift(newCustomer);
+        
+        // Re-render the customers list
+        renderCustomers(currentCustomers);
+        
+        // Update statistics
+        currentStats = await statsService.getStoreStats();
+        updateStatsDisplay();
+        updateTopDebtors(currentCustomers);
         
         showAlert('تم إضافة العميل بنجاح', 'success');
         closeModal();
@@ -523,4 +546,683 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+
+// Show customer details modal
+window.showCustomerDetails = async (customerId) => {
+    try {
+        const customer = currentCustomers.find(c => c.id === customerId);
+        if (!customer) {
+            showAlert('العميل غير موجود', 'error');
+            return;
+        }
+        
+        // Fill customer info
+        document.getElementById('customer-details-title').textContent = `تفاصيل العميل - ${customer.name}`;
+        document.getElementById('detail-customer-name').textContent = customer.name;
+        document.getElementById('detail-customer-phone').textContent = customer.phone;
+        document.getElementById('detail-customer-address').textContent = customer.address || 'غير محدد';
+        
+        const debtElement = document.getElementById('detail-customer-debt');
+        if (customer.totalDebt > 0) {
+            debtElement.textContent = formatCurrency(customer.totalDebt);
+            debtElement.className = 'debt-amount positive';
+        } else {
+            debtElement.textContent = 'لا يوجد ديون';
+            debtElement.className = 'debt-amount zero';
+        }
+        
+        // Set customer ID for transactions
+        document.getElementById('transaction-customer-id').value = customerId;
+        
+        // Load customer transactions
+        await loadCustomerTransactions(customerId);
+        
+        // Show modal
+        showModal('customer-details-modal');
+        
+    } catch (error) {
+        console.error('Error showing customer details:', error);
+        showAlert('حدث خطأ في عرض تفاصيل العميل', 'error');
+    }
+};
+
+// Load customer transactions
+const loadCustomerTransactions = async (customerId) => {
+    const transactionsContainer = document.getElementById('customer-transactions');
+    
+    try {
+        // Show loading
+        transactionsContainer.innerHTML = `
+            <div class="loading-transactions">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>جاري تحميل المعاملات...</p>
+            </div>
+        `;
+        
+        const transactions = await transactionService.getCustomerTransactions(customerId);
+        
+        if (transactions.length === 0) {
+            transactionsContainer.innerHTML = `
+                <div class="empty-transactions">
+                    <i class="fas fa-receipt"></i>
+                    <p>لا توجد معاملات لهذا العميل</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const transactionsHTML = transactions.map(transaction => `
+            <div class="transaction-item">
+                <div class="transaction-info">
+                    <div class="transaction-type ${transaction.type}">
+                        <i class="fas ${transaction.type === 'debt' ? 'fa-plus' : 'fa-minus'}"></i>
+                        ${transaction.type === 'debt' ? 'دين جديد' : 'دفعة'}
+                    </div>
+                    <div class="transaction-description">
+                        ${transaction.description || 'بدون وصف'}
+                    </div>
+                    <div class="transaction-date">
+                        ${formatDateTime(transaction.createdAt.toDate())}
+                    </div>
+                </div>
+                <div class="transaction-actions">
+                    <button class="btn btn-danger btn-icon btn-sm" onclick="deleteTransaction('${transaction.id}', '${customerId}', ${transaction.amount}, '${transaction.type}')" title="حذف المعاملة">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div class="transaction-amount ${transaction.type}">
+                    ${transaction.type === 'debt' ? '+' : '-'}${formatCurrency(transaction.amount)}
+                </div>
+            </div>
+        `).join('');
+        
+        transactionsContainer.innerHTML = transactionsHTML;
+        
+    } catch (error) {
+        console.error('Error loading transactions:', error);
+        transactionsContainer.innerHTML = `
+            <div class="empty-transactions">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>حدث خطأ في تحميل المعاملات</p>
+            </div>
+        `;
+    }
+};
+
+// Edit customer
+window.editCustomer = (customerId) => {
+    const customer = currentCustomers.find(c => c.id === customerId);
+    if (!customer) {
+        showAlert('العميل غير موجود', 'error');
+        return;
+    }
+    
+    // Fill edit form
+    document.getElementById('edit-customer-id').value = customer.id;
+    document.getElementById('edit-customer-name').value = customer.name;
+    document.getElementById('edit-customer-phone').value = customer.phone;
+    document.getElementById('edit-customer-address').value = customer.address || '';
+    document.getElementById('edit-customer-notes').value = customer.notes || '';
+    
+    // Show edit modal
+    showModal('edit-customer-modal');
+};
+
+// Handle edit customer form
+const handleEditCustomer = async (e) => {
+    e.preventDefault();
+    
+    const customerId = document.getElementById('edit-customer-id').value;
+    const customerData = {
+        name: document.getElementById('edit-customer-name').value,
+        phone: document.getElementById('edit-customer-phone').value,
+        address: document.getElementById('edit-customer-address').value,
+        notes: document.getElementById('edit-customer-notes').value
+    };
+    
+    // Validation
+    if (!customerData.name || !customerData.phone) {
+        showAlert('يرجى إدخال اسم العميل ورقم الهاتف', 'warning');
+        return;
+    }
+    
+    // Phone validation
+    if (!/^05\d{8}$/.test(customerData.phone)) {
+        showAlert('رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+        return;
+    }
+    
+    // Check if phone already exists for another customer
+    const existingCustomer = currentCustomers.find(c => c.phone === customerData.phone && c.id !== customerId);
+    if (existingCustomer) {
+        showAlert('رقم الهاتف مسجل بالفعل لعميل آخر', 'error');
+        return;
+    }
+    
+    try {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+        
+        await customerService.updateCustomer(customerId, customerData);
+        
+        // Update customer in current list
+        const customerIndex = currentCustomers.findIndex(c => c.id === customerId);
+        if (customerIndex !== -1) {
+            currentCustomers[customerIndex] = { ...currentCustomers[customerIndex], ...customerData };
+            renderCustomers(currentCustomers);
+        }
+        
+        showAlert('تم تحديث بيانات العميل بنجاح', 'success');
+        closeModal();
+        
+    } catch (error) {
+        console.error('Edit customer error:', error);
+        showAlert('حدث خطأ في تحديث بيانات العميل', 'error');
+    } finally {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'حفظ التعديلات';
+    }
+};
+
+// Handle add transaction
+const handleAddTransaction = async (e) => {
+    e.preventDefault();
+    
+    const customerId = document.getElementById('transaction-customer-id').value;
+    const transactionData = {
+        type: document.getElementById('transaction-type').value,
+        amount: parseFloat(document.getElementById('transaction-amount').value),
+        description: document.getElementById('transaction-description').value
+    };
+    
+    // Validation
+    if (!transactionData.type || !transactionData.amount || transactionData.amount <= 0) {
+        showAlert('يرجى إدخال جميع البيانات المطلوبة', 'warning');
+        return;
+    }
+    
+    try {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإضافة...';
+        
+        const user = getCurrentUser();
+        await transactionService.addTransaction(user.uid, customerId, transactionData);
+        
+        // Update customer debt in current list
+        const customerIndex = currentCustomers.findIndex(c => c.id === customerId);
+        if (customerIndex !== -1) {
+            const increment = transactionData.type === 'debt' ? transactionData.amount : -transactionData.amount;
+            currentCustomers[customerIndex].totalDebt += increment;
+            
+            // Update debt display in modal
+            const customer = currentCustomers[customerIndex];
+            const debtElement = document.getElementById('detail-customer-debt');
+            if (customer.totalDebt > 0) {
+                debtElement.textContent = formatCurrency(customer.totalDebt);
+                debtElement.className = 'debt-amount positive';
+            } else {
+                debtElement.textContent = 'لا يوجد ديون';
+                debtElement.className = 'debt-amount zero';
+            }
+        }
+        
+        // Reload transactions
+        await loadCustomerTransactions(customerId);
+        
+        // Re-render customers list
+        renderCustomers(currentCustomers);
+        
+        // Update statistics
+        currentStats = await statsService.getStoreStats();
+        updateStatsDisplay();
+        updateTopDebtors(currentCustomers);
+        
+        showAlert(`تم إضافة ${transactionData.type === 'debt' ? 'الدين' : 'الدفعة'} بنجاح`, 'success');
+        e.target.reset();
+        
+    } catch (error) {
+        console.error('Add transaction error:', error);
+        showAlert('حدث خطأ في إضافة المعاملة', 'error');
+    } finally {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-plus"></i> إضافة المعاملة';
+    }
+};
+
+// Delete transaction
+window.deleteTransaction = async (transactionId, customerId, amount, type) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المعاملة؟')) {
+        return;
+    }
+    
+    try {
+        await transactionService.deleteTransaction(transactionId, customerId, amount, type);
+        
+        // Update customer debt in current list
+        const customerIndex = currentCustomers.findIndex(c => c.id === customerId);
+        if (customerIndex !== -1) {
+            const increment = type === 'debt' ? -amount : amount;
+            currentCustomers[customerIndex].totalDebt += increment;
+            
+            // Update debt display in modal
+            const customer = currentCustomers[customerIndex];
+            const debtElement = document.getElementById('detail-customer-debt');
+            if (customer.totalDebt > 0) {
+                debtElement.textContent = formatCurrency(customer.totalDebt);
+                debtElement.className = 'debt-amount positive';
+            } else {
+                debtElement.textContent = 'لا يوجد ديون';
+                debtElement.className = 'debt-amount zero';
+            }
+        }
+        
+        // Reload transactions
+        await loadCustomerTransactions(customerId);
+        
+        // Re-render customers list
+        renderCustomers(currentCustomers);
+        
+        // Update statistics
+        currentStats = await statsService.getStoreStats();
+        updateStatsDisplay();
+        updateTopDebtors(currentCustomers);
+        
+        showAlert('تم حذف المعاملة بنجاح', 'success');
+        
+    } catch (error) {
+        console.error('Delete transaction error:', error);
+        showAlert('حدث خطأ في حذف المعاملة', 'error');
+    }
+};
+
+// Show specific modal
+const showModal = (modalId) => {
+    // Hide all modals first
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+    
+    // Show target modal
+    document.getElementById(modalId).style.display = 'block';
+    document.getElementById('modal-overlay').classList.add('active');
+};
+
+// Update modal functions
+window.showAddCustomerModal = () => {
+    showModal('add-customer-modal');
+};
+
+// Update close modal function
+window.closeModal = () => {
+    document.getElementById('modal-overlay').classList.remove('active');
+    
+    // Hide all modals
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+    
+    // Reset forms
+    const forms = document.querySelectorAll('#modal-overlay form');
+    forms.forEach(form => form.reset());
+};
+
+
+// Transactions page functionality
+let currentTransactions = [];
+let filteredTransactions = [];
+let currentPage = 1;
+const transactionsPerPage = 10;
+
+// Load transactions page
+const loadTransactionsPage = async () => {
+    try {
+        // Load all transactions
+        currentTransactions = await transactionService.getStoreTransactions(null, 1000);
+        filteredTransactions = [...currentTransactions];
+        
+        // Populate customer filter
+        populateCustomerFilter();
+        
+        // Update summary
+        updateTransactionsSummary();
+        
+        // Render transactions table
+        renderTransactionsTable();
+        
+    } catch (error) {
+        console.error('Error loading transactions:', error);
+        showAlert('حدث خطأ في تحميل المعاملات', 'error');
+    }
+};
+
+// Populate customer filter dropdown
+const populateCustomerFilter = () => {
+    const customerFilter = document.getElementById('transaction-filter-customer');
+    if (!customerFilter) return;
+    
+    // Clear existing options except the first one
+    customerFilter.innerHTML = '<option value="">جميع العملاء</option>';
+    
+    // Get unique customers from transactions
+    const customerIds = [...new Set(currentTransactions.map(t => t.customerId))];
+    
+    customerIds.forEach(customerId => {
+        const customer = currentCustomers.find(c => c.id === customerId);
+        if (customer) {
+            const option = document.createElement('option');
+            option.value = customerId;
+            option.textContent = customer.name;
+            customerFilter.appendChild(option);
+        }
+    });
+};
+
+// Update transactions summary
+const updateTransactionsSummary = () => {
+    const debts = filteredTransactions.filter(t => t.type === 'debt');
+    const payments = filteredTransactions.filter(t => t.type === 'payment');
+    
+    const totalDebts = debts.reduce((sum, t) => sum + t.amount, 0);
+    const totalPayments = payments.reduce((sum, t) => sum + t.amount, 0);
+    const netAmount = totalDebts - totalPayments;
+    
+    // Update summary cards
+    document.getElementById('total-debts-amount').textContent = formatCurrency(totalDebts);
+    document.getElementById('total-debts-count').textContent = `${debts.length} معاملة`;
+    
+    document.getElementById('total-payments-amount').textContent = formatCurrency(totalPayments);
+    document.getElementById('total-payments-count').textContent = `${payments.length} معاملة`;
+    
+    document.getElementById('net-amount').textContent = formatCurrency(netAmount);
+    document.getElementById('total-transactions-count').textContent = `${filteredTransactions.length} معاملة`;
+};
+
+// Filter transactions
+window.filterTransactions = () => {
+    const typeFilter = document.getElementById('transaction-filter-type').value;
+    const customerFilter = document.getElementById('transaction-filter-customer').value;
+    const dateFilter = document.getElementById('transaction-filter-date').value;
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
+    
+    // Show/hide custom date range
+    const customDateRange = document.getElementById('custom-date-range');
+    if (dateFilter === 'custom') {
+        customDateRange.style.display = 'block';
+    } else {
+        customDateRange.style.display = 'none';
+    }
+    
+    filteredTransactions = currentTransactions.filter(transaction => {
+        // Type filter
+        if (typeFilter && transaction.type !== typeFilter) {
+            return false;
+        }
+        
+        // Customer filter
+        if (customerFilter && transaction.customerId !== customerFilter) {
+            return false;
+        }
+        
+        // Date filter
+        if (dateFilter) {
+            const transactionDate = transaction.createdAt.toDate();
+            const today = new Date();
+            
+            switch (dateFilter) {
+                case 'today':
+                    if (!isSameDay(transactionDate, today)) return false;
+                    break;
+                case 'week':
+                    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    if (transactionDate < weekAgo) return false;
+                    break;
+                case 'month':
+                    const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+                    if (transactionDate < monthAgo) return false;
+                    break;
+                case 'custom':
+                    if (dateFrom && transactionDate < new Date(dateFrom)) return false;
+                    if (dateTo && transactionDate > new Date(dateTo + 'T23:59:59')) return false;
+                    break;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Reset to first page
+    currentPage = 1;
+    
+    // Update summary and table
+    updateTransactionsSummary();
+    renderTransactionsTable();
+};
+
+// Check if two dates are the same day
+const isSameDay = (date1, date2) => {
+    return date1.getDate() === date2.getDate() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getFullYear() === date2.getFullYear();
+};
+
+// Render transactions table
+const renderTransactionsTable = () => {
+    const tableBody = document.getElementById('transactions-table-body');
+    const pagination = document.getElementById('transactions-pagination');
+    
+    if (filteredTransactions.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="no-data">لا توجد معاملات</td></tr>';
+        pagination.style.display = 'none';
+        return;
+    }
+    
+    // Calculate pagination
+    const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
+    const startIndex = (currentPage - 1) * transactionsPerPage;
+    const endIndex = Math.min(startIndex + transactionsPerPage, filteredTransactions.length);
+    const pageTransactions = filteredTransactions.slice(startIndex, endIndex);
+    
+    // Render table rows
+    const tableHTML = pageTransactions.map(transaction => {
+        const customer = currentCustomers.find(c => c.id === transaction.customerId);
+        const customerName = customer ? customer.name : 'عميل محذوف';
+        
+        return `
+            <tr>
+                <td>${formatDateTime(transaction.createdAt.toDate())}</td>
+                <td>${customerName}</td>
+                <td>
+                    <span class="transaction-type-badge ${transaction.type}">
+                        <i class="fas ${transaction.type === 'debt' ? 'fa-plus' : 'fa-minus'}"></i>
+                        ${transaction.type === 'debt' ? 'دين' : 'دفعة'}
+                    </span>
+                </td>
+                <td>${transaction.description || 'بدون وصف'}</td>
+                <td class="transaction-amount-cell ${transaction.type}">
+                    ${transaction.type === 'debt' ? '+' : '-'}${formatCurrency(transaction.amount)}
+                </td>
+                <td>
+                    <div class="transaction-actions">
+                        <button class="btn btn-danger btn-sm" onclick="deleteTransactionFromTable('${transaction.id}', '${transaction.customerId}', ${transaction.amount}, '${transaction.type}')" title="حذف">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    tableBody.innerHTML = tableHTML;
+    
+    // Update pagination
+    updatePagination(totalPages, startIndex, endIndex);
+};
+
+// Update pagination
+const updatePagination = (totalPages, startIndex, endIndex) => {
+    const pagination = document.getElementById('transactions-pagination');
+    const paginationInfo = document.getElementById('pagination-info-text');
+    const paginationNumbers = document.getElementById('pagination-numbers');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+    
+    if (totalPages <= 1) {
+        pagination.style.display = 'none';
+        return;
+    }
+    
+    pagination.style.display = 'flex';
+    
+    // Update info text
+    paginationInfo.textContent = `عرض ${startIndex + 1}-${endIndex} من ${filteredTransactions.length} معاملة`;
+    
+    // Update buttons
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+    
+    // Update page numbers
+    let numbersHTML = '';
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        numbersHTML += `
+            <a href="#" class="pagination-number ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i}); return false;">
+                ${i}
+            </a>
+        `;
+    }
+    
+    paginationNumbers.innerHTML = numbersHTML;
+};
+
+// Pagination functions
+window.previousPage = () => {
+    if (currentPage > 1) {
+        currentPage--;
+        renderTransactionsTable();
+    }
+};
+
+window.nextPage = () => {
+    const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderTransactionsTable();
+    }
+};
+
+window.goToPage = (page) => {
+    currentPage = page;
+    renderTransactionsTable();
+};
+
+// Refresh transactions
+window.refreshTransactions = async () => {
+    await loadTransactionsPage();
+    showAlert('تم تحديث المعاملات', 'success');
+};
+
+// Delete transaction from table
+window.deleteTransactionFromTable = async (transactionId, customerId, amount, type) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المعاملة؟')) {
+        return;
+    }
+    
+    try {
+        await transactionService.deleteTransaction(transactionId, customerId, amount, type);
+        
+        // Update customer debt in current list
+        const customerIndex = currentCustomers.findIndex(c => c.id === customerId);
+        if (customerIndex !== -1) {
+            const increment = type === 'debt' ? -amount : amount;
+            currentCustomers[customerIndex].totalDebt += increment;
+        }
+        
+        // Reload transactions
+        await loadTransactionsPage();
+        
+        // Re-render customers list if on customers page
+        renderCustomers(currentCustomers);
+        
+        // Update statistics
+        currentStats = await statsService.getStoreStats();
+        updateStatsDisplay();
+        updateTopDebtors(currentCustomers);
+        
+        showAlert('تم حذف المعاملة بنجاح', 'success');
+        
+    } catch (error) {
+        console.error('Delete transaction error:', error);
+        showAlert('حدث خطأ في حذف المعاملة', 'error');
+    }
+};
+
+// Export transactions
+window.exportTransactions = () => {
+    if (filteredTransactions.length === 0) {
+        showAlert('لا توجد معاملات للتصدير', 'warning');
+        return;
+    }
+    
+    // Create CSV content
+    const headers = ['التاريخ', 'العميل', 'النوع', 'الوصف', 'المبلغ'];
+    const csvContent = [
+        headers.join(','),
+        ...filteredTransactions.map(transaction => {
+            const customer = currentCustomers.find(c => c.id === transaction.customerId);
+            const customerName = customer ? customer.name : 'عميل محذوف';
+            
+            return [
+                formatDateTime(transaction.createdAt.toDate()),
+                customerName,
+                transaction.type === 'debt' ? 'دين' : 'دفعة',
+                transaction.description || 'بدون وصف',
+                transaction.amount
+            ].join(',');
+        })
+    ].join('\n');
+    
+    // Download CSV file
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showAlert('تم تصدير المعاملات بنجاح', 'success');
+};
+
+// Quick add transaction modal
+window.showQuickAddTransaction = () => {
+    // This would show a modal for quick transaction entry
+    // For now, just show an alert
+    showAlert('وظيفة المعاملة السريعة قيد التطوير', 'info');
+};
+
+// Update showPage function to load transactions when needed
+const originalShowPage = window.showPage;
+window.showPage = (pageId) => {
+    originalShowPage(pageId);
+    
+    // Load page-specific data
+    if (pageId === 'transactions') {
+        loadTransactionsPage();
+    }
+};
 
