@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام إدارة ديون المكتبة</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -334,20 +334,689 @@
                     </div>
                 </div>
 
-                <!-- Other pages will be added here -->
+                <!-- Transactions Page -->
                 <div id="transactions-page" class="page">
-                    <h2>صفحة المعاملات</h2>
-                    <p>هذه الصفحة قيد التطوير</p>
+                    <div class="page-header">
+                        <h2>المعاملات</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="exportTransactions()">
+                                <i class="fas fa-download"></i>
+                                تصدير
+                            </button>
+                            <button class="btn btn-primary" onclick="showQuickAddTransaction()">
+                                <i class="fas fa-plus"></i>
+                                معاملة سريعة
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="filters-section">
+                        <div class="filters-grid">
+                            <div class="filter-group">
+                                <label for="transaction-filter-type">نوع المعاملة</label>
+                                <select id="transaction-filter-type" onchange="filterTransactions()">
+                                    <option value="">جميع المعاملات</option>
+                                    <option value="debt">الديون</option>
+                                    <option value="payment">المدفوعات</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="transaction-filter-customer">العميل</label>
+                                <select id="transaction-filter-customer" onchange="filterTransactions()">
+                                    <option value="">جميع العملاء</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="transaction-filter-date">التاريخ</label>
+                                <select id="transaction-filter-date" onchange="filterTransactions()">
+                                    <option value="">جميع التواريخ</option>
+                                    <option value="today">اليوم</option>
+                                    <option value="week">هذا الأسبوع</option>
+                                    <option value="month">هذا الشهر</option>
+                                    <option value="custom">تاريخ مخصص</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" id="custom-date-range" style="display: none;">
+                                <label for="date-from">من تاريخ</label>
+                                <input type="date" id="date-from" onchange="filterTransactions()">
+                                <label for="date-to">إلى تاريخ</label>
+                                <input type="date" id="date-to" onchange="filterTransactions()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transactions Summary -->
+                    <div class="transactions-summary">
+                        <div class="summary-cards">
+                            <div class="summary-card debt">
+                                <div class="summary-icon">
+                                    <i class="fas fa-arrow-up"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h3 id="total-debts-amount">0 ريال</h3>
+                                    <p>إجمالي الديون</p>
+                                    <span id="total-debts-count">0 معاملة</span>
+                                </div>
+                            </div>
+                            <div class="summary-card payment">
+                                <div class="summary-icon">
+                                    <i class="fas fa-arrow-down"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h3 id="total-payments-amount">0 ريال</h3>
+                                    <p>إجمالي المدفوعات</p>
+                                    <span id="total-payments-count">0 معاملة</span>
+                                </div>
+                            </div>
+                            <div class="summary-card net">
+                                <div class="summary-icon">
+                                    <i class="fas fa-balance-scale"></i>
+                                </div>
+                                <div class="summary-content">
+                                    <h3 id="net-amount">0 ريال</h3>
+                                    <p>صافي المبلغ</p>
+                                    <span id="total-transactions-count">0 معاملة</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transactions List -->
+                    <div class="transactions-container">
+                        <div class="transactions-header">
+                            <h3>قائمة المعاملات</h3>
+                            <div class="transactions-controls">
+                                <button class="btn btn-outline btn-sm" onclick="refreshTransactions()">
+                                    <i class="fas fa-sync-alt"></i>
+                                    تحديث
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="transactions-table-container">
+                            <table class="transactions-table" id="transactions-table">
+                                <thead>
+                                    <tr>
+                                        <th>التاريخ</th>
+                                        <th>العميل</th>
+                                        <th>النوع</th>
+                                        <th>الوصف</th>
+                                        <th>المبلغ</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactions-table-body">
+                                    <tr>
+                                        <td colspan="6" class="no-data">لا توجد معاملات</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="pagination-container" id="transactions-pagination" style="display: none;">
+                            <div class="pagination-info">
+                                <span id="pagination-info-text">عرض 1-10 من 50 معاملة</span>
+                            </div>
+                            <div class="pagination-controls">
+                                <button class="btn btn-outline btn-sm" onclick="previousPage()" id="prev-page-btn" disabled>
+                                    <i class="fas fa-chevron-right"></i>
+                                    السابق
+                                </button>
+                                <span class="pagination-numbers" id="pagination-numbers"></span>
+                                <button class="btn btn-outline btn-sm" onclick="nextPage()" id="next-page-btn">
+                                    التالي
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="reports-page" class="page">
-                    <h2>صفحة التقارير</h2>
-                    <p>هذه الصفحة قيد التطوير</p>
+                    <div class="page-header">
+                        <h2>التقارير والإحصائيات</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="exportReport()">
+                                <i class="fas fa-download"></i>
+                                تصدير التقرير
+                            </button>
+                            <button class="btn btn-primary" onclick="refreshReports()">
+                                <i class="fas fa-sync-alt"></i>
+                                تحديث
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Report Period Selection -->
+                    <div class="report-period-section">
+                        <div class="period-selector">
+                            <label for="report-period">فترة التقرير:</label>
+                            <select id="report-period" onchange="updateReportPeriod()">
+                                <option value="today">اليوم</option>
+                                <option value="week">هذا الأسبوع</option>
+                                <option value="month" selected>هذا الشهر</option>
+                                <option value="quarter">هذا الربع</option>
+                                <option value="year">هذا العام</option>
+                                <option value="custom">فترة مخصصة</option>
+                            </select>
+                        </div>
+                        <div class="custom-period" id="custom-period" style="display: none;">
+                            <input type="date" id="report-date-from" onchange="updateReportPeriod()">
+                            <span>إلى</span>
+                            <input type="date" id="report-date-to" onchange="updateReportPeriod()">
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics -->
+                    <div class="key-metrics">
+                        <div class="metrics-grid">
+                            <div class="metric-card revenue">
+                                <div class="metric-icon">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="total-revenue">0 ريال</h3>
+                                    <p>إجمالي الإيرادات</p>
+                                    <span class="metric-change" id="revenue-change">+0%</span>
+                                </div>
+                            </div>
+                            <div class="metric-card collections">
+                                <div class="metric-icon">
+                                    <i class="fas fa-hand-holding-usd"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="total-collections">0 ريال</h3>
+                                    <p>إجمالي التحصيلات</p>
+                                    <span class="metric-change" id="collections-change">+0%</span>
+                                </div>
+                            </div>
+                            <div class="metric-card outstanding">
+                                <div class="metric-icon">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="outstanding-debt">0 ريال</h3>
+                                    <p>الديون المستحقة</p>
+                                    <span class="metric-change" id="debt-change">+0%</span>
+                                </div>
+                            </div>
+                            <div class="metric-card customers">
+                                <div class="metric-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="active-customers">0</h3>
+                                    <p>العملاء النشطون</p>
+                                    <span class="metric-change" id="customers-change">+0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="charts-section">
+                        <div class="charts-grid">
+                            <!-- Revenue vs Collections Chart -->
+                            <div class="chart-card">
+                                <div class="chart-header">
+                                    <h3>الإيرادات مقابل التحصيلات</h3>
+                                    <div class="chart-controls">
+                                        <button class="btn btn-outline btn-sm" onclick="toggleChartType('revenue-chart')">
+                                            <i class="fas fa-chart-bar"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="revenue-chart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Customer Debt Distribution -->
+                            <div class="chart-card">
+                                <div class="chart-header">
+                                    <h3>توزيع ديون العملاء</h3>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="debt-distribution-chart"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Monthly Trends -->
+                            <div class="chart-card full-width">
+                                <div class="chart-header">
+                                    <h3>الاتجاهات الشهرية</h3>
+                                    <div class="chart-legend">
+                                        <span class="legend-item debt">
+                                            <span class="legend-color"></span>
+                                            الديون
+                                        </span>
+                                        <span class="legend-item payment">
+                                            <span class="legend-color"></span>
+                                            المدفوعات
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="chart-container">
+                                    <canvas id="trends-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Reports -->
+                    <div class="detailed-reports">
+                        <div class="reports-grid">
+                            <!-- Top Customers -->
+                            <div class="report-card">
+                                <div class="report-header">
+                                    <h3>أفضل العملاء</h3>
+                                    <span class="report-subtitle">حسب إجمالي المعاملات</span>
+                                </div>
+                                <div class="report-content">
+                                    <div id="top-customers-list" class="customers-ranking">
+                                        <div class="loading-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <p>جاري التحميل...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Payment Methods -->
+                            <div class="report-card">
+                                <div class="report-header">
+                                    <h3>حالة الديون</h3>
+                                    <span class="report-subtitle">تصنيف العملاء</span>
+                                </div>
+                                <div class="report-content">
+                                    <div id="debt-status-breakdown" class="status-breakdown">
+                                        <div class="status-item">
+                                            <div class="status-indicator good"></div>
+                                            <div class="status-info">
+                                                <span class="status-label">عملاء بدون ديون</span>
+                                                <span class="status-count" id="no-debt-count">0</span>
+                                            </div>
+                                        </div>
+                                        <div class="status-item">
+                                            <div class="status-indicator warning"></div>
+                                            <div class="status-info">
+                                                <span class="status-label">ديون منخفضة (أقل من 500 ريال)</span>
+                                                <span class="status-count" id="low-debt-count">0</span>
+                                            </div>
+                                        </div>
+                                        <div class="status-item">
+                                            <div class="status-indicator danger"></div>
+                                            <div class="status-info">
+                                                <span class="status-label">ديون عالية (أكثر من 500 ريال)</span>
+                                                <span class="status-count" id="high-debt-count">0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Recent Activity -->
+                            <div class="report-card full-width">
+                                <div class="report-header">
+                                    <h3>النشاط الأخير</h3>
+                                    <span class="report-subtitle">آخر 10 معاملات</span>
+                                </div>
+                                <div class="report-content">
+                                    <div id="recent-activity" class="activity-list">
+                                        <div class="loading-state">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <p>جاري التحميل...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Statistics -->
+                    <div class="summary-statistics">
+                        <div class="statistics-card">
+                            <h3>إحصائيات الفترة المحددة</h3>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <label>عدد المعاملات:</label>
+                                    <span id="period-transactions-count">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <label>متوسط قيمة المعاملة:</label>
+                                    <span id="avg-transaction-value">0 ريال</span>
+                                </div>
+                                <div class="stat-item">
+                                    <label>أكبر معاملة:</label>
+                                    <span id="max-transaction-value">0 ريال</span>
+                                </div>
+                                <div class="stat-item">
+                                    <label>أصغر معاملة:</label>
+                                    <span id="min-transaction-value">0 ريال</span>
+                                </div>
+                                <div class="stat-item">
+                                    <label>معدل التحصيل:</label>
+                                    <span id="collection-rate">0%</span>
+                                </div>
+                                <div class="stat-item">
+                                    <label>عدد العملاء الجدد:</label>
+                                    <span id="new-customers-count">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="settings-page" class="page">
-                    <h2>صفحة الإعدادات</h2>
-                    <p>هذه الصفحة قيد التطوير</p>
+                    <div class="page-header">
+                        <h2>الإعدادات</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-outline" onclick="resetSettings()">
+                                <i class="fas fa-undo"></i>
+                                إعادة تعيين
+                            </button>
+                            <button class="btn btn-primary" onclick="saveAllSettings()">
+                                <i class="fas fa-save"></i>
+                                حفظ جميع الإعدادات
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="settings-container">
+                        <!-- Store Information -->
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>
+                                    <i class="fas fa-store"></i>
+                                    معلومات المكتب
+                                </h3>
+                                <p>تحديث معلومات مكتبك الأساسية</p>
+                            </div>
+                            <div class="section-content">
+                                <form id="store-info-form">
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label for="store-name">اسم المكتب</label>
+                                            <input type="text" id="store-name" placeholder="اسم مكتبك">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="store-phone">رقم الهاتف</label>
+                                            <input type="tel" id="store-phone" placeholder="05xxxxxxxx">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="store-email">البريد الإلكتروني</label>
+                                            <input type="email" id="store-email" placeholder="store@example.com">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="store-cr">السجل التجاري</label>
+                                            <input type="text" id="store-cr" placeholder="رقم السجل التجاري">
+                                        </div>
+                                        <div class="form-group full-width">
+                                            <label for="store-address">العنوان</label>
+                                            <textarea id="store-address" rows="3" placeholder="عنوان المكتب"></textarea>
+                                        </div>
+                                        <div class="form-group full-width">
+                                            <label for="store-description">وصف المكتب</label>
+                                            <textarea id="store-description" rows="3" placeholder="وصف مختصر عن المكتب"></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="section-actions">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save"></i>
+                                            حفظ معلومات المكتب
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Account Settings -->
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>
+                                    <i class="fas fa-user-cog"></i>
+                                    إعدادات الحساب
+                                </h3>
+                                <p>إدارة حسابك وكلمة المرور</p>
+                            </div>
+                            <div class="section-content">
+                                <div class="account-info">
+                                    <div class="info-item">
+                                        <label>البريد الإلكتروني:</label>
+                                        <span id="current-email">loading...</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>تاريخ إنشاء الحساب:</label>
+                                        <span id="account-created">loading...</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>آخر تسجيل دخول:</label>
+                                        <span id="last-login">loading...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="password-section">
+                                    <h4>تغيير كلمة المرور</h4>
+                                    <form id="change-password-form">
+                                        <div class="form-group">
+                                            <label for="current-password">كلمة المرور الحالية</label>
+                                            <input type="password" id="current-password" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="new-password">كلمة المرور الجديدة</label>
+                                            <input type="password" id="new-password" required minlength="6">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="confirm-password">تأكيد كلمة المرور</label>
+                                            <input type="password" id="confirm-password" required>
+                                        </div>
+                                        <div class="section-actions">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-key"></i>
+                                                تغيير كلمة المرور
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Preferences -->
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>
+                                    <i class="fas fa-cogs"></i>
+                                    تفضيلات النظام
+                                </h3>
+                                <p>تخصيص إعدادات النظام حسب احتياجاتك</p>
+                            </div>
+                            <div class="section-content">
+                                <div class="preferences-grid">
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <h4>العملة الافتراضية</h4>
+                                            <p>العملة المستخدمة في عرض المبالغ</p>
+                                        </div>
+                                        <select id="default-currency">
+                                            <option value="SAR">ريال سعودي (ر.س)</option>
+                                            <option value="USD">دولار أمريكي ($)</option>
+                                            <option value="EUR">يورو (€)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <h4>تنسيق التاريخ</h4>
+                                            <p>كيفية عرض التواريخ في النظام</p>
+                                        </div>
+                                        <select id="date-format">
+                                            <option value="DD/MM/YYYY">يوم/شهر/سنة</option>
+                                            <option value="MM/DD/YYYY">شهر/يوم/سنة</option>
+                                            <option value="YYYY-MM-DD">سنة-شهر-يوم</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <h4>عدد العناصر في الصفحة</h4>
+                                            <p>عدد العملاء/المعاملات المعروضة في كل صفحة</p>
+                                        </div>
+                                        <select id="items-per-page">
+                                            <option value="10">10 عناصر</option>
+                                            <option value="25">25 عنصر</option>
+                                            <option value="50">50 عنصر</option>
+                                            <option value="100">100 عنصر</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <h4>الوضع المظلم</h4>
+                                            <p>تفعيل الوضع المظلم للواجهة</p>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="dark-mode">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <h4>الإشعارات</h4>
+                                            <p>تفعيل إشعارات النظام</p>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="notifications" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="preference-item">
+                                        <div class="preference-info">
+                                            <h4>حفظ تلقائي</h4>
+                                            <p>حفظ البيانات تلقائياً أثناء الكتابة</p>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="auto-save" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="section-actions">
+                                    <button type="button" class="btn btn-primary" onclick="savePreferences()">
+                                        <i class="fas fa-save"></i>
+                                        حفظ التفضيلات
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Management -->
+                        <div class="settings-section">
+                            <div class="section-header">
+                                <h3>
+                                    <i class="fas fa-database"></i>
+                                    إدارة البيانات
+                                </h3>
+                                <p>نسخ احتياطي واستيراد وتصدير البيانات</p>
+                            </div>
+                            <div class="section-content">
+                                <div class="data-actions">
+                                    <div class="action-card">
+                                        <div class="action-icon">
+                                            <i class="fas fa-download"></i>
+                                        </div>
+                                        <div class="action-content">
+                                            <h4>تصدير البيانات</h4>
+                                            <p>تحميل نسخة من جميع بياناتك</p>
+                                            <button class="btn btn-outline" onclick="exportAllData()">
+                                                <i class="fas fa-download"></i>
+                                                تصدير الآن
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="action-card">
+                                        <div class="action-icon">
+                                            <i class="fas fa-upload"></i>
+                                        </div>
+                                        <div class="action-content">
+                                            <h4>استيراد البيانات</h4>
+                                            <p>رفع ملف بيانات للاستيراد</p>
+                                            <input type="file" id="import-file" accept=".json,.csv" style="display: none;">
+                                            <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">
+                                                <i class="fas fa-upload"></i>
+                                                اختيار ملف
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="action-card">
+                                        <div class="action-icon">
+                                            <i class="fas fa-cloud"></i>
+                                        </div>
+                                        <div class="action-content">
+                                            <h4>نسخة احتياطية</h4>
+                                            <p>إنشاء نسخة احتياطية في السحابة</p>
+                                            <button class="btn btn-primary" onclick="createBackup()">
+                                                <i class="fas fa-cloud-upload-alt"></i>
+                                                إنشاء نسخة احتياطية
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Danger Zone -->
+                        <div class="settings-section danger-zone">
+                            <div class="section-header">
+                                <h3>
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    منطقة الخطر
+                                </h3>
+                                <p>إجراءات لا يمكن التراجع عنها</p>
+                            </div>
+                            <div class="section-content">
+                                <div class="danger-actions">
+                                    <div class="danger-item">
+                                        <div class="danger-info">
+                                            <h4>حذف جميع المعاملات</h4>
+                                            <p>حذف جميع المعاملات مع الاحتفاظ بالعملاء</p>
+                                        </div>
+                                        <button class="btn btn-danger" onclick="deleteAllTransactions()">
+                                            <i class="fas fa-trash"></i>
+                                            حذف المعاملات
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="danger-item">
+                                        <div class="danger-info">
+                                            <h4>حذف جميع البيانات</h4>
+                                            <p>حذف جميع العملاء والمعاملات نهائياً</p>
+                                        </div>
+                                        <button class="btn btn-danger" onclick="deleteAllData()">
+                                            <i class="fas fa-trash-alt"></i>
+                                            حذف جميع البيانات
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="danger-item">
+                                        <div class="danger-info">
+                                            <h4>حذف الحساب</h4>
+                                            <p>حذف حسابك وجميع البيانات نهائياً</p>
+                                        </div>
+                                        <button class="btn btn-danger" onclick="deleteAccount()">
+                                            <i class="fas fa-user-times"></i>
+                                            حذف الحساب
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -390,16 +1059,127 @@
                 </form>
             </div>
         </div>
+
+        <!-- Edit Customer Modal -->
+        <div id="edit-customer-modal" class="modal" style="display: none;">
+            <div class="modal-header">
+                <h3>تعديل بيانات العميل</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <form id="edit-customer-form">
+                    <input type="hidden" id="edit-customer-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-customer-name">اسم العميل</label>
+                            <input type="text" id="edit-customer-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-customer-phone">رقم الهاتف</label>
+                            <input type="tel" id="edit-customer-phone" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-customer-address">العنوان</label>
+                        <input type="text" id="edit-customer-address">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-customer-notes">ملاحظات</label>
+                        <textarea id="edit-customer-notes" rows="3"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Customer Details Modal -->
+        <div id="customer-details-modal" class="modal" style="display: none; max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="customer-details-title">تفاصيل العميل</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <!-- Customer Info -->
+                <div id="customer-info-section" class="customer-details-section">
+                    <h4>معلومات العميل</h4>
+                    <div class="customer-info-grid">
+                        <div class="info-item">
+                            <label>الاسم:</label>
+                            <span id="detail-customer-name"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>الهاتف:</label>
+                            <span id="detail-customer-phone"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>العنوان:</label>
+                            <span id="detail-customer-address"></span>
+                        </div>
+                        <div class="info-item">
+                            <label>الرصيد الحالي:</label>
+                            <span id="detail-customer-debt" class="debt-amount"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Transaction Section -->
+                <div class="customer-details-section">
+                    <h4>إضافة معاملة جديدة</h4>
+                    <form id="add-transaction-form">
+                        <input type="hidden" id="transaction-customer-id">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="transaction-type">نوع المعاملة</label>
+                                <select id="transaction-type" required>
+                                    <option value="">اختر نوع المعاملة</option>
+                                    <option value="debt">دين جديد</option>
+                                    <option value="payment">دفعة / تسديد</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="transaction-amount">المبلغ (ريال)</label>
+                                <input type="number" id="transaction-amount" min="0" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="transaction-description">الوصف</label>
+                            <input type="text" id="transaction-description" placeholder="وصف المعاملة">
+                        </div>
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i>
+                                إضافة المعاملة
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Transactions History -->
+                <div class="customer-details-section">
+                    <h4>تاريخ المعاملات</h4>
+                    <div id="customer-transactions" class="transactions-list">
+                        <!-- Transactions will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Alert Messages -->
     <div id="alert-container" class="alert-container"></div>
 
     <!-- Scripts -->
-    <script type="module" src="firebase.js"></script>
-    <script type="module" src="auth.js"></script>
-    <script type="module" src="database.js"></script>
-    <script type="module" src="app.js"></script>
+    <script type="module" src="js/firebase.js"></script>
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/database.js"></script>
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>
 
