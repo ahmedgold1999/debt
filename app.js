@@ -1226,3 +1226,572 @@ window.showPage = (pageId) => {
     }
 };
 
+
+// Settings page functionality
+let currentSettings = {
+    currency: 'SAR',
+    dateFormat: 'DD/MM/YYYY',
+    itemsPerPage: 10,
+    darkMode: false,
+    notifications: true,
+    autoSave: true
+};
+
+// Load settings page
+const loadSettingsPage = async () => {
+    try {
+        // Load store information
+        await loadStoreInfo();
+        
+        // Load account information
+        await loadAccountInfo();
+        
+        // Load user preferences
+        loadUserPreferences();
+        
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        showAlert('حدث خطأ في تحميل الإعدادات', 'error');
+    }
+};
+
+// Load store information
+const loadStoreInfo = async () => {
+    try {
+        const user = getCurrentUser();
+        const storeInfo = await storeService.getStoreInfo(user.uid);
+        
+        if (storeInfo) {
+            document.getElementById('store-name').value = storeInfo.name || '';
+            document.getElementById('store-phone').value = storeInfo.phone || '';
+            document.getElementById('store-email').value = storeInfo.email || '';
+            document.getElementById('store-cr').value = storeInfo.cr || '';
+            document.getElementById('store-address').value = storeInfo.address || '';
+            document.getElementById('store-description').value = storeInfo.description || '';
+        }
+    } catch (error) {
+        console.error('Error loading store info:', error);
+    }
+};
+
+// Load account information
+const loadAccountInfo = async () => {
+    try {
+        const user = getCurrentUser();
+        
+        document.getElementById('current-email').textContent = user.email;
+        document.getElementById('account-created').textContent = formatDateTime(user.metadata.creationTime);
+        document.getElementById('last-login').textContent = formatDateTime(user.metadata.lastSignInTime);
+        
+    } catch (error) {
+        console.error('Error loading account info:', error);
+    }
+};
+
+// Load user preferences
+const loadUserPreferences = () => {
+    // Load from localStorage
+    const savedSettings = localStorage.getItem('userSettings');
+    if (savedSettings) {
+        currentSettings = { ...currentSettings, ...JSON.parse(savedSettings) };
+    }
+    
+    // Apply to form
+    document.getElementById('default-currency').value = currentSettings.currency;
+    document.getElementById('date-format').value = currentSettings.dateFormat;
+    document.getElementById('items-per-page').value = currentSettings.itemsPerPage;
+    document.getElementById('dark-mode').checked = currentSettings.darkMode;
+    document.getElementById('notifications').checked = currentSettings.notifications;
+    document.getElementById('auto-save').checked = currentSettings.autoSave;
+    
+    // Apply dark mode if enabled
+    if (currentSettings.darkMode) {
+        document.body.classList.add('dark-mode');
+    }
+};
+
+// Save preferences
+window.savePreferences = () => {
+    currentSettings = {
+        currency: document.getElementById('default-currency').value,
+        dateFormat: document.getElementById('date-format').value,
+        itemsPerPage: parseInt(document.getElementById('items-per-page').value),
+        darkMode: document.getElementById('dark-mode').checked,
+        notifications: document.getElementById('notifications').checked,
+        autoSave: document.getElementById('auto-save').checked
+    };
+    
+    // Save to localStorage
+    localStorage.setItem('userSettings', JSON.stringify(currentSettings));
+    
+    // Apply dark mode
+    if (currentSettings.darkMode) {
+        document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
+    }
+    
+    showAlert('تم حفظ التفضيلات بنجاح', 'success');
+};
+
+// Export all data
+window.exportAllData = async () => {
+    try {
+        const user = getCurrentUser();
+        
+        // Get all data
+        const [customers, transactions, storeInfo] = await Promise.all([
+            customerService.getCustomers(user.uid),
+            transactionService.getStoreTransactions(user.uid, 10000),
+            storeService.getStoreInfo(user.uid)
+        ]);
+        
+        const exportData = {
+            exportDate: new Date().toISOString(),
+            storeInfo,
+            customers: customers.map(customer => ({
+                ...customer,
+                createdAt: customer.createdAt.toDate().toISOString()
+            })),
+            transactions: transactions.map(transaction => ({
+                ...transaction,
+                createdAt: transaction.createdAt.toDate().toISOString()
+            }))
+        };
+        
+        // Create and download JSON file
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `store_data_${new Date().toISOString().split('T')[0]}.json`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showAlert('تم تصدير البيانات بنجاح', 'success');
+        
+    } catch (error) {
+        console.error('Error exporting data:', error);
+        showAlert('حدث خطأ في تصدير البيانات', 'error');
+    }
+};
+
+// Update showPage function to load settings when needed
+const originalShowPageForSettings = window.showPage;
+window.showPage = (pageId) => {
+    originalShowPageForSettings(pageId);
+    
+    // Load page-specific data
+    if (pageId === 'settings') {
+        loadSettingsPage();
+    } else if (pageId === 'transactions') {
+        loadTransactionsPage();
+    }
+};
+
+
+// Receipt functionality
+let currentReceipt = null;
+
+// Generate and show receipt
+window.generateReceipt = (transaction, customer, storeInfo) => {
+    const receiptNumber = generateReceiptNumber();
+    const receiptDate = new Date();
+    
+    currentReceipt = {
+        number: receiptNumber,
+        date: receiptDate,
+        transaction,
+        customer,
+        storeInfo: storeInfo || {
+            name: 'مكتبة القرطاسية',
+            address: 'بغداد، العراق',
+            phone: '07XX XXX XXXX',
+            email: 'info@stationery.iq'
+        }
+    };
+    
+    renderReceipt();
+    showModal('receipt-modal');
+};
+
+// Render receipt content
+const renderReceipt = () => {
+    if (!currentReceipt) return;
+    
+    const { number, date, transaction, customer, storeInfo } = currentReceipt;
+    
+    const receiptHTML = `
+        <div class="receipt-content">
+            <div class="receipt-title">
+                <h1>${storeInfo.name}</h1>
+                <p>وصل تسديد رقم: ${number}</p>
+            </div>
+            
+            <div class="receipt-info">
+                <div class="info-section">
+                    <h3>معلومات المكتب</h3>
+                    <div class="info-item">
+                        <span class="info-label">الاسم:</span>
+                        <span class="info-value">${storeInfo.name}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">العنوان:</span>
+                        <span class="info-value">${storeInfo.address}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">الهاتف:</span>
+                        <span class="info-value">${formatIraqiPhone(storeInfo.phone)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">البريد:</span>
+                        <span class="info-value">${storeInfo.email}</span>
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h3>معلومات العميل</h3>
+                    <div class="info-item">
+                        <span class="info-label">الاسم:</span>
+                        <span class="info-value">${customer.name}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">الهاتف:</span>
+                        <span class="info-value">${formatIraqiPhone(customer.phone)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">التاريخ:</span>
+                        <span class="info-value">${formatDateTime(date)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">رقم الوصل:</span>
+                        <span class="info-value">${number}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="receipt-details">
+                <h3>تفاصيل التسديد</h3>
+                <div class="amount-display">
+                    <div class="amount">${formatCurrency(transaction.amount)}</div>
+                    <div class="amount-text">المبلغ المسدد</div>
+                </div>
+                
+                <div class="info-item">
+                    <span class="info-label">نوع المعاملة:</span>
+                    <span class="info-value">${transaction.type === 'payment' ? 'تسديد' : 'دين'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">الوصف:</span>
+                    <span class="info-value">${transaction.description || 'تسديد دين'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">الرصيد المتبقي:</span>
+                    <span class="info-value">${formatCurrency(customer.totalDebt || 0)}</span>
+                </div>
+            </div>
+            
+            <div class="receipt-signature">
+                <div class="signature-section">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">توقيع العميل</div>
+                </div>
+                <div class="signature-section">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">توقيع المكتب</div>
+                </div>
+            </div>
+            
+            <div class="receipt-footer">
+                <p>شكراً لتعاملكم معنا</p>
+                <p>تم إنشاء هذا الوصل بتاريخ ${formatDateTime(date)}</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('receipt-content').innerHTML = receiptHTML;
+};
+
+// Print receipt
+window.printReceipt = () => {
+    window.print();
+};
+
+// Download receipt as PDF
+window.downloadReceipt = () => {
+    if (!currentReceipt) return;
+    
+    // Create a new window for PDF generation
+    const printWindow = window.open('', '_blank');
+    const receiptContent = document.getElementById('receipt-content').innerHTML;
+    
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+            <meta charset="UTF-8">
+            <title>وصل تسديد - ${currentReceipt.number}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { 
+                    font-family: 'Cairo', sans-serif; 
+                    margin: 20px; 
+                    direction: rtl; 
+                    line-height: 1.6;
+                }
+                .receipt-content { max-width: 600px; margin: 0 auto; }
+                .receipt-title { text-align: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #3b82f6; }
+                .receipt-title h1 { color: #3b82f6; font-size: 2rem; margin-bottom: 0.5rem; }
+                .receipt-info { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+                .info-section h3 { color: #3b82f6; font-size: 1.125rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
+                .info-item { display: flex; justify-content: space-between; margin-bottom: 0.75rem; padding: 0.5rem 0; }
+                .info-label { font-weight: 600; color: #555; }
+                .info-value { color: #333; font-weight: 500; }
+                .receipt-details { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid #e9ecef; }
+                .amount-display { text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: 8px; margin: 1rem 0; }
+                .amount-display .amount { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+                .receipt-signature { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; }
+                .signature-section { text-align: center; }
+                .signature-line { border-bottom: 1px solid #333; margin-bottom: 0.5rem; height: 50px; }
+                .signature-label { font-weight: 600; color: #555; }
+                .receipt-footer { text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; color: #666; font-size: 0.875rem; }
+            </style>
+        </head>
+        <body>
+            ${receiptContent}
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
+};
+
+// Share receipt
+window.shareReceipt = () => {
+    if (!currentReceipt) return;
+    
+    const shareText = `وصل تسديد رقم: ${currentReceipt.number}
+العميل: ${currentReceipt.customer.name}
+المبلغ: ${formatCurrency(currentReceipt.transaction.amount)}
+التاريخ: ${formatDateTime(currentReceipt.date)}`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'وصل تسديد',
+            text: shareText
+        });
+    } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(shareText).then(() => {
+            showAlert('تم نسخ تفاصيل الوصل', 'success');
+        });
+    }
+};
+
+// Enhanced reports functionality
+window.loadReportsPage = async () => {
+    try {
+        const user = getCurrentUser();
+        
+        // Load all data for reports
+        const [customers, transactions, storeInfo] = await Promise.all([
+            customerService.getCustomers(user.uid),
+            transactionService.getStoreTransactions(user.uid, 1000),
+            storeService.getStoreInfo(user.uid)
+        ]);
+        
+        // Generate comprehensive reports
+        generateReportsData(customers, transactions, storeInfo);
+        
+    } catch (error) {
+        console.error('Error loading reports:', error);
+        showAlert('حدث خطأ في تحميل التقارير', 'error');
+    }
+};
+
+// Generate reports data
+const generateReportsData = (customers, transactions, storeInfo) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Calculate key metrics
+    const totalCustomers = customers.length;
+    const activeCustomers = customers.filter(c => c.totalDebt > 0).length;
+    const totalDebt = customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0);
+    
+    const payments = transactions.filter(t => t.type === 'payment');
+    const debts = transactions.filter(t => t.type === 'debt');
+    
+    const totalPayments = payments.reduce((sum, t) => sum + t.amount, 0);
+    const totalDebtsAmount = debts.reduce((sum, t) => sum + t.amount, 0);
+    
+    // Update metrics display
+    document.getElementById('total-revenue').textContent = formatCurrency(totalDebtsAmount);
+    document.getElementById('total-collections').textContent = formatCurrency(totalPayments);
+    document.getElementById('outstanding-debt').textContent = formatCurrency(totalDebt);
+    document.getElementById('active-customers').textContent = activeCustomers;
+    
+    // Generate customer rankings
+    generateCustomerRankings(customers);
+    
+    // Generate debt status breakdown
+    generateDebtStatusBreakdown(customers);
+    
+    // Generate recent activity
+    generateRecentActivity(transactions.slice(0, 10));
+    
+    // Update summary statistics
+    updateSummaryStatistics(transactions, customers);
+};
+
+// Generate customer rankings
+const generateCustomerRankings = (customers) => {
+    const topCustomers = customers
+        .sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0))
+        .slice(0, 5);
+    
+    const rankingsHTML = topCustomers.map((customer, index) => {
+        const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
+        return `
+            <div class="customer-rank-item">
+                <div class="rank-number ${rankClass}">${index + 1}</div>
+                <div class="customer-rank-info">
+                    <div class="customer-rank-name">${customer.name}</div>
+                    <div class="customer-rank-details">${formatIraqiPhone(customer.phone)}</div>
+                </div>
+                <div class="customer-rank-amount">${formatCurrency(customer.totalDebt || 0)}</div>
+            </div>
+        `;
+    }).join('');
+    
+    document.getElementById('top-customers-list').innerHTML = rankingsHTML || '<p>لا توجد بيانات</p>';
+};
+
+// Generate debt status breakdown
+const generateDebtStatusBreakdown = (customers) => {
+    const noDebt = customers.filter(c => (c.totalDebt || 0) <= 0).length;
+    const lowDebt = customers.filter(c => (c.totalDebt || 0) > 0 && (c.totalDebt || 0) <= 50000).length;
+    const highDebt = customers.filter(c => (c.totalDebt || 0) > 50000).length;
+    
+    document.getElementById('no-debt-count').textContent = noDebt;
+    document.getElementById('low-debt-count').textContent = lowDebt;
+    document.getElementById('high-debt-count').textContent = highDebt;
+};
+
+// Generate recent activity
+const generateRecentActivity = (transactions) => {
+    const activityHTML = transactions.map(transaction => {
+        const iconClass = transaction.type === 'payment' ? 'payment' : 'debt';
+        const amountClass = transaction.type === 'payment' ? 'payment' : 'debt';
+        const sign = transaction.type === 'payment' ? '+' : '-';
+        
+        return `
+            <div class="activity-item">
+                <div class="activity-icon ${iconClass}">
+                    <i class="fas fa-${transaction.type === 'payment' ? 'arrow-down' : 'arrow-up'}"></i>
+                </div>
+                <div class="activity-details">
+                    <div class="activity-description">
+                        ${transaction.type === 'payment' ? 'تسديد من' : 'دين على'} ${transaction.customerName}
+                    </div>
+                    <div class="activity-time">${formatDateTime(transaction.createdAt.toDate())}</div>
+                </div>
+                <div class="activity-amount ${amountClass}">
+                    ${sign}${formatCurrency(transaction.amount)}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    document.getElementById('recent-activity').innerHTML = activityHTML || '<p>لا توجد معاملات حديثة</p>';
+};
+
+// Update summary statistics
+const updateSummaryStatistics = (transactions, customers) => {
+    const transactionCount = transactions.length;
+    const avgTransaction = transactionCount > 0 ? 
+        transactions.reduce((sum, t) => sum + t.amount, 0) / transactionCount : 0;
+    const maxTransaction = transactionCount > 0 ? 
+        Math.max(...transactions.map(t => t.amount)) : 0;
+    const minTransaction = transactionCount > 0 ? 
+        Math.min(...transactions.map(t => t.amount)) : 0;
+    
+    const payments = transactions.filter(t => t.type === 'payment');
+    const debts = transactions.filter(t => t.type === 'debt');
+    const totalPayments = payments.reduce((sum, t) => sum + t.amount, 0);
+    const totalDebts = debts.reduce((sum, t) => sum + t.amount, 0);
+    const collectionRate = totalDebts > 0 ? (totalPayments / totalDebts * 100) : 0;
+    
+    document.getElementById('period-transactions-count').textContent = transactionCount;
+    document.getElementById('avg-transaction-value').textContent = formatCurrency(avgTransaction);
+    document.getElementById('max-transaction-value').textContent = formatCurrency(maxTransaction);
+    document.getElementById('min-transaction-value').textContent = formatCurrency(minTransaction);
+    document.getElementById('collection-rate').textContent = `${collectionRate.toFixed(1)}%`;
+    document.getElementById('new-customers-count').textContent = customers.length;
+};
+
+// Enhanced phone number validation for Iraqi numbers
+const validateAndFormatPhone = (input) => {
+    const phone = input.value;
+    const isValid = validateIraqiPhone(phone);
+    const formGroup = input.closest('.form-group');
+    
+    // Remove existing validation classes
+    formGroup.classList.remove('valid', 'invalid');
+    
+    // Remove existing validation message
+    const existingMessage = formGroup.querySelector('.validation-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    
+    if (phone && !isValid) {
+        formGroup.classList.add('invalid');
+        const message = document.createElement('span');
+        message.className = 'validation-message error';
+        message.textContent = 'رقم الهاتف غير صحيح. استخدم تنسيق: 07XX XXX XXXX';
+        formGroup.appendChild(message);
+    } else if (phone && isValid) {
+        formGroup.classList.add('valid');
+        input.value = formatIraqiPhone(phone);
+    }
+    
+    return isValid;
+};
+
+// Add phone validation to all phone inputs
+document.addEventListener('DOMContentLoaded', () => {
+    const phoneInputs = document.querySelectorAll('input[type="tel"], input[placeholder*="07"]');
+    phoneInputs.forEach(input => {
+        input.addEventListener('blur', () => validateAndFormatPhone(input));
+        input.addEventListener('input', () => {
+            // Real-time formatting
+            const formatted = formatIraqiPhone(input.value);
+            if (formatted !== input.value) {
+                const cursorPos = input.selectionStart;
+                input.value = formatted;
+                input.setSelectionRange(cursorPos, cursorPos);
+            }
+        });
+    });
+});
+
+// Update currency display throughout the app
+const updateCurrencyDisplay = () => {
+    const currencyElements = document.querySelectorAll('.currency, .amount, .total-debt, .total-paid');
+    currencyElements.forEach(element => {
+        if (element.textContent && !isNaN(parseFloat(element.textContent))) {
+            const amount = parseFloat(element.textContent);
+            element.textContent = formatCurrency(amount);
+        }
+    });
+};
+
