@@ -1172,6 +1172,40 @@
         </div>
     </div>
 
+    <!-- Receipt Modal -->
+    <div id="receipt-modal" class="modal">
+        <div class="modal-content receipt-modal">
+            <div class="receipt-header">
+                <div class="receipt-logo">
+                    <i class="fas fa-receipt"></i>
+                    <h2>وصل تسديد</h2>
+                </div>
+                <button class="close-btn" onclick="closeModal('receipt-modal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="receipt-body" id="receipt-content">
+                <!-- Receipt content will be generated here -->
+            </div>
+            
+            <div class="receipt-actions">
+                <button class="btn btn-outline" onclick="printReceipt()">
+                    <i class="fas fa-print"></i>
+                    طباعة
+                </button>
+                <button class="btn btn-primary" onclick="downloadReceipt()">
+                    <i class="fas fa-download"></i>
+                    تحميل PDF
+                </button>
+                <button class="btn btn-secondary" onclick="shareReceipt()">
+                    <i class="fas fa-share"></i>
+                    مشاركة
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Alert Messages -->
     <div id="alert-container" class="alert-container"></div>
 
