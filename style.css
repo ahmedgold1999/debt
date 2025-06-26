@@ -2664,3 +2664,349 @@ body {
     }
 }
 
+
+/* Receipt Modal Styles */
+.receipt-modal {
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.receipt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--primary-color), #2563eb);
+    color: white;
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.receipt-logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.receipt-logo i {
+    font-size: 2rem;
+}
+
+.receipt-logo h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.receipt-body {
+    padding: 2rem;
+    background: white;
+    color: #333;
+    line-height: 1.6;
+}
+
+.receipt-content {
+    font-family: 'Cairo', sans-serif;
+}
+
+.receipt-title {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.receipt-title h1 {
+    color: var(--primary-color);
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.receipt-title p {
+    color: #666;
+    font-size: 1rem;
+}
+
+.receipt-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.info-section h3 {
+    color: var(--primary-color);
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #555;
+}
+
+.info-value {
+    color: #333;
+    font-weight: 500;
+}
+
+.receipt-details {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    margin-bottom: 2rem;
+    border: 1px solid #e9ecef;
+}
+
+.receipt-details h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.amount-display {
+    text-align: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border-radius: var(--radius);
+    margin: 1rem 0;
+}
+
+.amount-display .amount {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.amount-display .amount-text {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.receipt-footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+    color: #666;
+    font-size: 0.875rem;
+}
+
+.receipt-signature {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.signature-section {
+    text-align: center;
+}
+
+.signature-line {
+    border-bottom: 1px solid #333;
+    margin-bottom: 0.5rem;
+    height: 50px;
+}
+
+.signature-label {
+    font-weight: 600;
+    color: #555;
+}
+
+.receipt-actions {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 0 0 var(--radius) var(--radius);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: 1px solid #6c757d;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    border-color: #5a6268;
+}
+
+/* Iraqi Phone Number Input Styling */
+.phone-input {
+    position: relative;
+}
+
+.phone-input::before {
+    content: '🇮🇶';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    z-index: 1;
+}
+
+.phone-input input {
+    padding-left: 3rem;
+    direction: ltr;
+    text-align: left;
+}
+
+/* Iraqi Currency Display */
+.currency-iqd {
+    font-family: 'Cairo', sans-serif;
+    font-weight: 600;
+}
+
+.currency-iqd::after {
+    content: ' د.ع';
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+/* Enhanced Stats Cards for Iraqi Context */
+.stat-card.debt-high {
+    border-left: 4px solid #dc3545;
+}
+
+.stat-card.debt-medium {
+    border-left: 4px solid #ffc107;
+}
+
+.stat-card.debt-low {
+    border-left: 4px solid #28a745;
+}
+
+.stat-card.debt-paid {
+    border-left: 4px solid #17a2b8;
+}
+
+/* Print Styles for Receipt */
+@media print {
+    .receipt-modal {
+        max-width: none;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        box-shadow: none;
+        border: none;
+    }
+    
+    .receipt-header,
+    .receipt-actions {
+        display: none;
+    }
+    
+    .receipt-body {
+        padding: 0;
+        background: white;
+    }
+    
+    .modal-overlay {
+        display: none;
+    }
+    
+    body * {
+        visibility: hidden;
+    }
+    
+    .receipt-modal,
+    .receipt-modal * {
+        visibility: visible;
+    }
+    
+    .receipt-modal {
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+}
+
+/* Responsive Design for Receipt */
+@media (max-width: 768px) {
+    .receipt-modal {
+        width: 95%;
+        margin: 1rem;
+    }
+    
+    .receipt-info {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .receipt-signature {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .amount-display .amount {
+        font-size: 2rem;
+    }
+    
+    .receipt-actions {
+        flex-direction: column;
+    }
+    
+    .receipt-actions .btn {
+        width: 100%;
+    }
+}
+
+/* Iraqi-specific enhancements */
+.iraqi-flag {
+    display: inline-block;
+    width: 20px;
+    height: 15px;
+    background: linear-gradient(to bottom, #ce1126 33%, #ffffff 33%, #ffffff 66%, #000000 66%);
+    border-radius: 2px;
+    margin-right: 0.5rem;
+}
+
+.arabic-numbers {
+    font-family: 'Cairo', sans-serif;
+    direction: ltr;
+    unicode-bidi: bidi-override;
+}
+
+/* Enhanced form validation for Iraqi context */
+.form-group.invalid input {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.form-group.valid input {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.validation-message {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.validation-message.error {
+    color: #dc3545;
+}
+
+.validation-message.success {
+    color: #28a745;
+}
+
